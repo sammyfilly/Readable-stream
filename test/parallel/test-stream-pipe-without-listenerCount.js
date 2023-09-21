@@ -1,20 +1,30 @@
-'use strict';
-var common = require('../common');
-var stream = require('../../');
+'use strict'
 
-var r = new stream({
-  read: noop});
-r.listenerCount = undefined;
+const tap = require('tap')
+const silentConsole = {
+  log() {},
+  error() {}
+}
+const common = require('../common')
+const stream = require('../../lib/ours/index')
+const r = new stream.Stream()
+r.listenerCount = undefined
+const w = new stream.Stream()
+w.listenerCount = undefined
+w.on('pipe', function () {
+  r.emit('error', new Error('Readable Error'))
+  w.emit('error', new Error('Writable Error'))
+})
+r.on('error', common.mustCall())
+w.on('error', common.mustCall())
+r.pipe(w)
 
-var w = new stream();
-w.listenerCount = undefined;
-
-w.on('pipe', function() {
-  r.emit('error', new Error('Readable Error'));
-  w.emit('error', new Error('Writable Error'));
-});
-r.on('error', common.mustCall(noop));
-w.on('error', common.mustCall(noop));
-r.pipe(w);
-
-function noop() {};
+/* replacement start */
+process.on('beforeExit', (code) => {
+  if (code === 0) {
+    tap.pass('test succeeded')
+  } else {
+    tap.fail(`test failed - exited code ${code}`)
+  }
+})
+/* replacement end */

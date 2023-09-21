@@ -1,66 +1,81 @@
-'use strict';
-var common = require('../common');
-var assert = require('assert');
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-var Readable = require('../../lib/_stream_readable');
-var Writable = require('../../lib/_stream_writable');
-var util = require('util');
+'use strict'
 
-util.inherits(TestReadable, Readable);
-function TestReadable(opt) {
-  if (!(this instanceof TestReadable))
-    return new TestReadable(opt);
-  Readable.call(this, opt);
-  this._ended = false;
+const tap = require('tap')
+const silentConsole = {
+  log() {},
+  error() {}
+}
+const common = require('../common')
+const assert = require('assert')
+const { Readable, Writable } = require('../../lib/ours/index')
+class TestReadable extends Readable {
+  constructor(opt) {
+    super(opt)
+    this._ended = false
+  }
+  _read() {
+    if (this._ended) this.emit('error', new Error('_read called twice'))
+    this._ended = true
+    this.push(null)
+  }
+}
+class TestWritable extends Writable {
+  constructor(opt) {
+    super(opt)
+    this._written = []
+  }
+  _write(chunk, encoding, cb) {
+    this._written.push(chunk)
+    cb()
+  }
 }
 
-TestReadable.prototype._read = function(n) {
-  if (this._ended)
-    this.emit('error', new Error('_read called twice'));
-  this._ended = true;
-  this.push(null);
-};
+// This one should not emit 'end' until we read() from it later.
+const ender = new TestReadable()
 
-util.inherits(TestWritable, Writable);
-function TestWritable(opt) {
-  if (!(this instanceof TestWritable))
-    return new TestWritable(opt);
-  Writable.call(this, opt);
-  this._written = [];
-}
-
-TestWritable.prototype._write = function(chunk, encoding, cb) {
-  this._written.push(chunk);
-  cb();
-};
-
-// this one should not emit 'end' until we read() from it later.
-var ender = new TestReadable();
-var enderEnded = false;
-
-// what happens when you pipe() a Readable that's already ended?
-var piper = new TestReadable();
+// What happens when you pipe() a Readable that's already ended?
+const piper = new TestReadable()
 // pushes EOF null, and length=0, so this will trigger 'end'
-piper.read();
+piper.read()
+setTimeout(
+  common.mustCall(function () {
+    ender.on('end', common.mustCall())
+    const c = ender.read()
+    assert.strictEqual(c, null)
+    const w = new TestWritable()
+    w.on('finish', common.mustCall())
+    piper.pipe(w)
+  }),
+  1
+)
 
-setTimeout(function() {
-  ender.on('end', function() {
-    enderEnded = true;
-  });
-  assert(!enderEnded);
-  var c = ender.read();
-  assert.equal(c, null);
-
-  var w = new TestWritable();
-  var writableFinished = false;
-  w.on('finish', function() {
-    writableFinished = true;
-  });
-  piper.pipe(w);
-
-  process.on('exit', function() {
-    assert(enderEnded);
-    assert(writableFinished);
-    console.log('ok');
-  });
-});
+/* replacement start */
+process.on('beforeExit', (code) => {
+  if (code === 0) {
+    tap.pass('test succeeded')
+  } else {
+    tap.fail(`test failed - exited code ${code}`)
+  }
+})
+/* replacement end */

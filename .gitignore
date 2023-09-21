@@ -1,2 +1,6 @@
+coverage/
 node_modules/
-.zuul.yml
+node-*.tar.gz
+package-lock.json
+tmp/
+readable-stream-test/dist/

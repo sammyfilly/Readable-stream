@@ -1,27 +1,25 @@
-'use strict';
-var common = require('../common');
+'use strict'
 
-var stream = require('../../');
+const stream = require('../../lib/ours/index')
+const { kReadableStreamSuiteName } = require('./symbols')
 module.exports = function (t) {
-  t.test('is paused', function (t) {
-    var readable = new stream.Readable();
+  t.plan(4)
+  const readable = new stream.Readable()
 
-    // _read is a noop, here.
-    readable._read = Function();
+  // _read is a noop, here.
+  readable._read = () => {}
 
-    // default state of a stream is not "paused"
-    t.notOk(readable.isPaused());
+  // default state of a stream is not "paused"
+  t.notOk(readable.isPaused())
 
-    // make the stream start flowing...
-    readable.on('data', Function());
+  // make the stream start flowing...
+  readable.on('data', () => {})
 
-    // still not paused.
-    t.notOk(readable.isPaused());
-
-    readable.pause();
-    t.ok(readable.isPaused());
-    readable.resume();
-    t.notOk(readable.isPaused());
-    t.end();
-  });
+  // still not paused.
+  t.notOk(readable.isPaused())
+  readable.pause()
+  t.ok(readable.isPaused())
+  readable.resume()
+  t.notOk(readable.isPaused())
 }
+module.exports[kReadableStreamSuiteName] = 'stream-ispaused'

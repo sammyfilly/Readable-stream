@@ -1,24 +1,19 @@
-'use strict';
-var common = require('../common');
+'use strict'
 
-var Readable = require('../../lib/_stream_readable');
-var EE = require('events').EventEmitter;
+const { EventEmitter: EE } = require('events')
+const Readable = require('../../lib/ours/index')
+const { kReadableStreamSuiteName } = require('./symbols')
 module.exports = function (t) {
-  t.test('wrap empty', function (t) {
-    t.plan(1);
-    var oldStream = new EE();
-    oldStream.pause = function() {};
-    oldStream.resume = function() {};
-
-    var newStream = new Readable().wrap(oldStream);
-
-    newStream
-      .on('readable', function() {})
-      .on('end', function() {
-        t.ok(true, 'ended');
-      });
-
-    oldStream.emit('end');
-
-  })
+  t.plan(1)
+  const oldStream = new EE()
+  oldStream.pause = function () {}
+  oldStream.resume = function () {}
+  const newStream = new Readable().wrap(oldStream)
+  newStream
+    .on('readable', function () {})
+    .on('end', function () {
+      t.ok(true, 'ended')
+    })
+  oldStream.emit('end')
 }
+module.exports[kReadableStreamSuiteName] = 'stream2-readable-wrap-empty'

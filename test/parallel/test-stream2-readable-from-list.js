@@ -1,99 +1,129 @@
-'use strict';
-var assert = require('assert');
-var common = require('../common');
-var fromList = require('../../lib/_stream_readable')._fromList;
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-// tiny node-tap lookalike.
-var tests = [];
-var count = 0;
+// Flags: --expose-internals
 
-function test(name, fn) {
-  count++;
-  tests.push([name, fn]);
+'use strict'
+
+const tap = require('tap')
+const silentConsole = {
+  log() {},
+  error() {}
 }
-
-function run() {
-  var next = tests.shift();
-  if (!next)
-    return console.error('ok');
-
-  var name = next[0];
-  var fn = next[1];
-  console.log('# %s', name);
-  fn({
-    same: assert.deepEqual,
-    equal: assert.equal,
-    end: function() {
-      count--;
-      run();
-    }
-  });
+require('../common')
+const assert = require('assert')
+const fromList = require('../../lib/ours/index').Readable._fromList
+const BufferList = require('../../lib/internal/streams/buffer_list')
+const util = require('util')
+function bufferListFromArray(arr) {
+  const bl = new BufferList()
+  for (let i = 0; i < arr.length; ++i) bl.push(arr[i])
+  return bl
 }
+{
+  // Verify behavior with buffers
+  let list = [Buffer.from('foog'), Buffer.from('bark'), Buffer.from('bazy'), Buffer.from('kuel')]
+  list = bufferListFromArray(list)
+  assert.strictEqual(typeof list.head, 'object')
+  assert.strictEqual(typeof list.tail, 'object')
+  assert.strictEqual(list.length, 4)
 
-// ensure all tests have run
-process.on('exit', function() {
-  assert.equal(count, 0);
-});
+  // Read more than the first element.
+  let ret = fromList(6, {
+    buffer: list,
+    length: 16
+  })
+  assert.strictEqual(ret.toString(), 'foogba')
 
-process.nextTick(run);
+  // Read exactly the first element.
+  ret = fromList(2, {
+    buffer: list,
+    length: 10
+  })
+  assert.strictEqual(ret.toString(), 'rk')
 
+  // Read less than the first element.
+  ret = fromList(2, {
+    buffer: list,
+    length: 8
+  })
+  assert.strictEqual(ret.toString(), 'ba')
 
-test('buffers', function(t) {
-  // have a length
-  var len = 16;
-  var list = [ new Buffer('foog'),
-               new Buffer('bark'),
-               new Buffer('bazy'),
-               new Buffer('kuel') ];
-
-  // read more than the first element.
-  var ret = fromList(6, { buffer: list, length: 16 });
-  t.equal(ret.toString(), 'foogba');
-
-  // read exactly the first element.
-  ret = fromList(2, { buffer: list, length: 10 });
-  t.equal(ret.toString(), 'rk');
-
-  // read less than the first element.
-  ret = fromList(2, { buffer: list, length: 8 });
-  t.equal(ret.toString(), 'ba');
-
-  // read more than we have.
-  ret = fromList(100, { buffer: list, length: 6 });
-  t.equal(ret.toString(), 'zykuel');
+  // Read more than we have.
+  ret = fromList(100, {
+    buffer: list,
+    length: 6
+  })
+  assert.strictEqual(ret.toString(), 'zykuel')
 
   // all consumed.
-  t.same(list, []);
+  assert.deepStrictEqual(list, new BufferList())
+}
+{
+  // Verify behavior with strings
+  let list = ['foog', 'bark', 'bazy', 'kuel']
+  list = bufferListFromArray(list)
 
-  t.end();
-});
+  // Read more than the first element.
+  let ret = fromList(6, {
+    buffer: list,
+    length: 16,
+    decoder: true
+  })
+  assert.strictEqual(ret, 'foogba')
 
-test('strings', function(t) {
-  // have a length
-  var len = 16;
-  var list = [ 'foog',
-               'bark',
-               'bazy',
-               'kuel' ];
+  // Read exactly the first element.
+  ret = fromList(2, {
+    buffer: list,
+    length: 10,
+    decoder: true
+  })
+  assert.strictEqual(ret, 'rk')
 
-  // read more than the first element.
-  var ret = fromList(6, { buffer: list, length: 16, decoder: true });
-  t.equal(ret, 'foogba');
+  // Read less than the first element.
+  ret = fromList(2, {
+    buffer: list,
+    length: 8,
+    decoder: true
+  })
+  assert.strictEqual(ret, 'ba')
 
-  // read exactly the first element.
-  ret = fromList(2, { buffer: list, length: 10, decoder: true });
-  t.equal(ret, 'rk');
-
-  // read less than the first element.
-  ret = fromList(2, { buffer: list, length: 8, decoder: true });
-  t.equal(ret, 'ba');
-
-  // read more than we have.
-  ret = fromList(100, { buffer: list, length: 6, decoder: true });
-  t.equal(ret, 'zykuel');
+  // Read more than we have.
+  ret = fromList(100, {
+    buffer: list,
+    length: 6,
+    decoder: true
+  })
+  assert.strictEqual(ret, 'zykuel')
 
   // all consumed.
-  t.same(list, []);
+  assert.deepStrictEqual(list, new BufferList())
+}
 
-  t.end();
-});
+/* replacement start */
+process.on('beforeExit', (code) => {
+  if (code === 0) {
+    tap.pass('test succeeded')
+  } else {
+    tap.fail(`test failed - exited code ${code}`)
+  }
+})
+/* replacement end */

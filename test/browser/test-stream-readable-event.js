@@ -1,114 +1,102 @@
-'use strict';
-var common = require('../common');
+'use strict'
 
-var Readable = require('../../').Readable;
+/* replacement start */
+const { Buffer } = require('buffer')
 
-function first(t) {
-  // First test, not reading when the readable is added.
-  // make sure that on('readable', ...) triggers a readable event.
-  var r = new Readable({
-    highWaterMark: 3
-  });
+/* replacement end */
 
-  var _readCalled = false;
-  r._read = function(n) {
-    _readCalled = true;
-  };
+const { Readable } = require('../../lib/ours/index')
+const { kReadableStreamSuiteName, kReadableStreamSuiteHasMultipleTests } = require('./symbols')
+module.exports = function (test) {
+  test('readable events - first', (t) => {
+    t.plan(3)
 
-  // This triggers a 'readable' event, which is lost.
-  r.push(new Buffer('blerg'));
+    // First test, not reading when the readable is added.
+    // make sure that on('readable', ...) triggers a readable event.
+    const r = new Readable({
+      highWaterMark: 3
+    })
+    let _readCalled = false
+    r._read = function (n) {
+      _readCalled = true
+    }
 
-  var caughtReadable = false;
-  setTimeout(function() {
-    // we're testing what we think we are
-    t.notOk(r._readableState.reading);
-    r.on('readable', function() {
-      caughtReadable = true;
-      setTimeout(function() {
-        // we're testing what we think we are
-        t.notOk(_readCalled);
+    // This triggers a 'readable' event, which is lost.
+    r.push(Buffer.from('blerg'))
+    let caughtReadable = false
+    setTimeout(function () {
+      // we're testing what we think we are
+      t.notOk(r._readableState.reading)
+      r.on('readable', function () {
+        caughtReadable = true
+        setTimeout(function () {
+          // we're testing what we think we are
+          t.notOk(_readCalled)
+          t.ok(caughtReadable)
+        })
+      })
+    })
+  })
+  test('readable events - second', (t) => {
+    t.plan(3)
 
-        t.ok(caughtReadable);
-        t.end();
-      });
-    });
-  });
+    // second test, make sure that readable is re-emitted if there's
+    // already a length, while it IS reading.
 
+    const r = new Readable({
+      highWaterMark: 3
+    })
+    let _readCalled = false
+    r._read = function (n) {
+      _readCalled = true
+    }
 
+    // This triggers a 'readable' event, which is lost.
+    r.push(Buffer.from('bl'))
+    let caughtReadable = false
+    setTimeout(function () {
+      // assert we're testing what we think we are
+      t.ok(r._readableState.reading)
+      r.on('readable', function () {
+        caughtReadable = true
+        setTimeout(function () {
+          // we're testing what we think we are
+          t.ok(_readCalled)
+          t.ok(caughtReadable)
+        })
+      })
+    })
+  })
+  test('readable events - third', (t) => {
+    t.plan(3)
+
+    // Third test, not reading when the stream has not passed
+    // the highWaterMark but *has* reached EOF.
+    const r = new Readable({
+      highWaterMark: 30
+    })
+    let _readCalled = false
+    r._read = function (n) {
+      _readCalled = true
+    }
+
+    // This triggers a 'readable' event, which is lost.
+    r.push(Buffer.from('blerg'))
+    r.push(null)
+    let caughtReadable = false
+    setTimeout(function () {
+      // assert we're testing what we think we are
+      t.notOk(r._readableState.reading)
+      r.on('readable', function () {
+        caughtReadable = true
+        setTimeout(function () {
+          // we're testing what we think we are
+          t.notOk(_readCalled)
+          t.ok(caughtReadable)
+        })
+      })
+    })
+  })
 }
-
-function second(t) {
-  // second test, make sure that readable is re-emitted if there's
-  // already a length, while it IS reading.
-
-  var r = new Readable({
-    highWaterMark: 3
-  });
-
-  var _readCalled = false;
-  r._read = function(n) {
-    _readCalled = true;
-  };
-
-  // This triggers a 'readable' event, which is lost.
-  r.push(new Buffer('bl'));
-
-  var caughtReadable = false;
-  setTimeout(function() {
-    // assert we're testing what we think we are
-    t.ok(r._readableState.reading);
-    r.on('readable', function() {
-      caughtReadable = true;
-      setTimeout(function() {
-        // we're testing what we think we are
-        t.ok(_readCalled);
-
-        t.ok(caughtReadable);
-        t.end();
-      });
-    });
-  });
-
-}
-
-function third(t) {
-  // Third test, not reading when the stream has not passed
-  // the highWaterMark but *has* reached EOF.
-  var r = new Readable({
-    highWaterMark: 30
-  });
-
-  var _readCalled = false;
-  r._read = function(n) {
-    _readCalled = true;
-  };
-
-  // This triggers a 'readable' event, which is lost.
-  r.push(new Buffer('blerg'));
-  r.push(null);
-
-  var caughtReadable = false;
-  setTimeout(function() {
-    // assert we're testing what we think we are
-    t.notOk(r._readableState.reading);
-    r.on('readable', function() {
-      caughtReadable = true;
-      setTimeout(function() {
-        // we're testing what we think we are
-        t.notOk(_readCalled);
-
-        t.ok(caughtReadable);
-        t.end();
-      });
-    });
-  });
-
-};
-
-module.exports = function (t) {
-  t.test('readable events', function (t) {
-    t.test('first', first);
-    t.test('second', second);
-    t.test('third', third);
-  });
-}
+module.exports[kReadableStreamSuiteName] = 'stream-readable-event'
+module.exports[kReadableStreamSuiteHasMultipleTests] = true
